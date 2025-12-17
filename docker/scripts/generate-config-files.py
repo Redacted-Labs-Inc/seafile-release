@@ -666,6 +666,10 @@ server {
         'listen_ipv6_directive': 'listen [::]:80;' if os.environ.get('ENABLE_IPV6', 'true').lower() == 'true' else '',
     }
 
+    nginx_conf_dir = os.path.dirname(path)
+    if not os.path.exists(nginx_conf_dir):
+        os.makedirs(nginx_conf_dir)
+
     if not os.path.exists(path):
         logger.info(f'Generating {os.path.basename(path)} since it does not exist yet')
     else:
