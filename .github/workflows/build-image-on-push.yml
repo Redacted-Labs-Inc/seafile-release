@@ -7,8 +7,6 @@ on:
       - "pre-v*.*.*"
   workflow_dispatch:
 
-env:
-  IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/seafile-professional"
 
 jobs:
   init-vars:
@@ -71,6 +69,9 @@ jobs:
       - name: Set current time
         id: current_time
         run: echo "time=$(date --iso-8601=seconds)" >> $GITHUB_OUTPUT
+      - name: Set image name
+        id: set_image_name
+        run: echo "image_name=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/seafile-professional" >> $GITHUB_OUTPUT
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -86,5 +87,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:commit-${{ steps.get_commit.outputs.short_sha }}
-            ${{ env.IMAGE_NAME }}:${{ needs.init-vars.outputs.git_tag_prefix }}${{ needs.init-vars.outputs.version }}
+            ${{ steps.set_image_name.outputs.image_name }}:commit-${{ steps.get_commit.outputs.short_sha }}
+            ${{ steps.set_image_name.outputs.image_name }}:${{ needs.init-vars.outputs.git_tag_prefix }}${{ needs.init-vars.outputs.version }}
