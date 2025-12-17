@@ -218,11 +218,13 @@ CACHES = {
     if cache_backend == 'memcached':
         django_cache_backend = 'django_pylibmc.memcached.PyLibMCCache'
         cache_host = os.environ.get('SEAHUB__CACHE_HOST', 'memcached')
+        default_port = '11211'
     elif cache_backend == 'redis':
         # TODO: The redis python package is missing from the container image, therefore the redis cache backend does not work!
         django_cache_backend = 'django.core.cache.backends.redis.RedisCache'
         # The redis:// protocol prefix is required
         cache_host = f'redis://{os.environ.get("SEAHUB__CACHE_HOST", "redis")}'
+        default_port = '6379'
     else:
         logger.error('Error: Invalid value for variable "SEAHUB_CACHE_BACKEND": "%s" (must be "memcached" or "redis")', cache_backend)
         sys.exit(1)
@@ -230,7 +232,7 @@ CACHES = {
     cache_config = {
         'backend': django_cache_backend,
         'host': cache_host,
-        'port': os.environ.get('SEAHUB__CACHE_PORT', '11211'),
+        'port': os.environ.get('SEAHUB__CACHE_PORT', default_port),
     }
 
     logging_template = """
@@ -681,6 +683,28 @@ server {
         # Use lstrip() to remove leading whitespace
         file.write(config_template.lstrip() % config)
 
+def generate_seafile_conf_with_cache_provider():
+    cache_provider = os.environ.get('CACHE_PROVIDER', 'memcached').lower()
+    
+    if cache_provider == 'redis':
+        redis_host = os.environ.get('REDIS_HOST', '127.0.0.1')
+        redis_port = os.environ.get('REDIS_PORT', '6379')
+        max_connections = os.environ.get('REDIS_MAX_CONNECTIONS', '100')
+        
+        os.environ['SEAFILE__redis__redis_host'] = redis_host
+        os.environ['SEAFILE__redis__redis_port'] = redis_port
+        os.environ['SEAFILE__redis__max_connections'] = max_connections
+        
+        for key in list(os.environ.keys()):
+            if key.startswith('SEAFILE__memcached__'):
+                del os.environ[key]
+    elif cache_provider == 'memcached':
+        for key in list(os.environ.keys()):
+            if key.startswith('SEAFILE__redis__'):
+                del os.environ[key]
+    
+    generate_conf_file(path=SEAFILE_CONF_PATH, prefix='SEAFILE__')
+
 if __name__ == '__main__':
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
@@ -694,7 +718,7 @@ if __name__ == '__main__':
     generate_conf_file(path=CCNET_CONF_PATH, prefix='CCNET__')
     generate_conf_file(path=SEAFDAV_CONF_PATH, prefix='SEAFDAV__')
     generate_conf_file(path=SEAFEVENTS_CONF_PATH, prefix='SEAFEVENTS__')
-    generate_conf_file(path=SEAFILE_CONF_PATH, prefix='SEAFILE__')
+    generate_seafile_conf_with_cache_provider()
 
     generate_gunicorn_config_file(path=GUNICORN_CONF_PATH)
     generate_seahub_settings_file(path=SEAHUB_SETTINGS_PATH)
