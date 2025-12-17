@@ -1,4 +1,4 @@
-FROM seafileltd/seafile-pro-mc:11.0.20
+FROM seafileltd/seafile-pro-mc:13.0.14
 
 COPY scripts/* /scripts
 
