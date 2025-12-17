@@ -6,6 +6,16 @@ on:
       - "v*.*.*"
       - "pre-v*.*.*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., 11.0.20)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as prerelease (adds "pre-" prefix)'
+        required: false
+        type: boolean
+        default: false
 
 
 jobs:
@@ -31,7 +41,7 @@ jobs:
         id: extract_github_ref_version
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "version=manual" >> $GITHUB_OUTPUT
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=$(echo ${{ github.ref }} | awk -F/ '{print $3}' | awk -Fv '{print $2}')" >> $GITHUB_OUTPUT
           fi
@@ -39,14 +49,20 @@ jobs:
         id: extract_github_ref_prefix
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "git_tag_prefix=" >> $GITHUB_OUTPUT
+            if [[ "${{ inputs.prerelease }}" == "true" ]]; then
+              echo "git_tag_prefix=pre-" >> $GITHUB_OUTPUT
+            else
+              echo "git_tag_prefix=" >> $GITHUB_OUTPUT
+            fi
           else
             echo "git_tag_prefix=$(echo ${{ github.ref }} | awk -F/ '{print $3}' | awk -Fv '{print $1}')" >> $GITHUB_OUTPUT
           fi
       - name: Set prerelease to true or false depending on git tag prefix
         id: set_prerelease
         run: |
-          if [[ "${{ steps.extract_github_ref_prefix.outputs.git_tag_prefix }}" == "pre-" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "prerelease_bool=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ steps.extract_github_ref_prefix.outputs.git_tag_prefix }}" == "pre-" ]]; then
             echo "prerelease_bool=true" >> $GITHUB_OUTPUT
           elif [[ "${{ steps.extract_github_ref_prefix.outputs.git_tag_prefix }}" == "" ]]; then
             echo "prerelease_bool=false" >> $GITHUB_OUTPUT
