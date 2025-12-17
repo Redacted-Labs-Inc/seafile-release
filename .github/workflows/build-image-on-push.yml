@@ -96,6 +96,25 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Delete existing package version (if rebuilding same tag)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          PACKAGE_NAME="seafile-professional"
+          VERSION="${{ needs.init-vars.outputs.git_tag_prefix }}${{ needs.init-vars.outputs.version }}"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          VERSIONS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/orgs/${OWNER}/packages/container/${PACKAGE_NAME}/versions")
+          
+          VERSION_ID=$(echo "$VERSIONS" | jq -r ".[] | select(.metadata.container.tags[]? == \"${VERSION}\") | .id" | head -1)
+          
+          if [ -n "$VERSION_ID" ] && [ "$VERSION_ID" != "null" ]; then
+            echo "Deleting existing version ${VERSION} (ID: ${VERSION_ID})"
+            curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/orgs/${OWNER}/packages/container/${PACKAGE_NAME}/versions/${VERSION_ID}" || true
+          else
+            echo "No existing version found for ${VERSION}"
+          fi
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
